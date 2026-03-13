@@ -1,39 +1,42 @@
 const {
     default: makeWASocket,
     useMultiFileAuthState,
-    fetchLatestBaileysVersion
+    fetchLatestBaileysVersion,
+    DisconnectReason
 } = require("@whiskeysockets/baileys");
 const pino = require("pino");
+const { Boom } = require("@hapi/boom");
 
 async function startBot() {
-    // استخدام مجلد جلسة ثابت لضمان عدم تكرار الطلبات غير الضرورية
-    const { state, saveCreds } = await useMultiFileAuthState("bot_session");
+    // استخدام اسم جلسة فريد في كل مرة لضمان عدم حدوث تداخل
+    const { state, saveCreds } = await useMultiFileAuthState("session_new_start");
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
         version,
-        logger: pino({ level: "fatal" }), // إخفاء التحذيرات المزعجة
+        logger: pino({ level: "fatal" }),
         printQRInTerminal: false,
         auth: state,
-        browser: ["المدرسة الرقمية", "Chrome", "1.0.0"]
+        // إضافة إعدادات المتصفح مهمة جداً للقبول
+        browser: ["Ubuntu", "Chrome", "20.0.04"]
     });
 
     sock.ev.on("connection.update", (update) => {
-        const { connection, qr } = update;
+        const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
-            // إضافة Timestamp للرابط لإجبار المتصفح على تحديث الصورة
-            const timestamp = Date.now();
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}&t=${timestamp}`;
-            
-            console.log("\n\n🔄 --- تم تحديث كود الـ QR الآن --- 🔄");
-            console.log("رابط الكود الجديد (اضغط عليه فوراً):");
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
+            console.log("\n\n🔄 --- امسح الكود الجديد الآن --- 🔄");
             console.log(qrUrl);
-            console.log("------------------------------------------\n\n");
+            console.log("----------------------------------\n\n");
         }
 
-        if (connection === "open") {
-            console.log("✅✅✅ مبروك! البوت متصل الآن بنجاح.");
+        if (connection === "close") {
+            const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log("❌ انقطع الاتصال، جاري المحاولة مرة أخرى...");
+            if (shouldReconnect) startBot();
+        } else if (connection === "open") {
+            console.log("\n\n✅✅✅ مبروووك! تم الاتصال بنجاح.. المدرسة تعمل!");
         }
     });
 
