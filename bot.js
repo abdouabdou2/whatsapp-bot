@@ -17,7 +17,7 @@ app.get('/qr', (req, res) => {
 app.get('/', (req, res) => res.send("✅ البوت يعمل! اذهب إلى /qr"));
 
 // ⚠️ إجبار المنفذ على 3000 ليتوافق مع إعدادات Railway عندك
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT ||8080;
 app.listen(PORT, '0.0.0.0', () => console.log(`🌐 Server active on port ${PORT}`));
 
 async function startBot() {
