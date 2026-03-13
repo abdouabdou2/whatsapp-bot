@@ -7,64 +7,62 @@ const {
 const mongoose = require('mongoose');
 const pino = require('pino');
 
-// دالة بدء البوت
 async function startBot() {
-    console.log("🔄 جاري تشغيل المحرك...");
+    console.log("🔄 جاري بدء المحرك وتجهيز المدرسة...");
 
-    // 1. الاتصال بقاعدة البيانات MongoDB
+    // 1. الاتصال بـ MongoDB
     const mongoURI = process.env.MONGODB_URI;
     try {
         await mongoose.connect(mongoURI);
-        console.log("✅ متصل بـ MongoDB بنجاح");
+        console.log("------------------------------------------");
+        console.log("✅ متصل بـ MongoDB بنجاح!");
+        console.log("------------------------------------------");
     } catch (err) {
-        console.error("❌ خطأ في الاتصال بقاعدة البيانات:", err.message);
-        return; // توقف إذا لم يتصل بالقاعدة
+        console.error("❌ خطأ في الاتصال بالقاعدة:", err.message);
+        return;
     }
 
-    // 2. إعداد الجلسة (استخدام اسم مجلد جديد تماماً لتجنب التضارب)
-    const { state, saveCreds } = await useMultiFileAuthState('session_clean_v1');
+    // 2. إعداد الجلسة (استخدام اسم مجلد جديد لضمان عدم وجود تعارض)
+    const { state, saveCreds } = await useMultiFileAuthState('session_fixed_v2');
     const { version } = await fetchLatestBaileysVersion();
 
-    // 3. إعداد اتصال الواتساب
+    // 3. إعداد اتصال الواتساب مع هوية متصفح حديثة
     const sock = makeWASocket({
         version,
         logger: pino({ level: 'fatal' }),
         auth: state,
-        printQRInTerminal: false, // سنستخدم الرابط بدلاً من الرموز المشوهة
-        // هوية متصفح حديثة جداً لتجنب خطأ "Impossible de connecter"
-        browser: ["Windows", "Chrome", "122.0.6261.112"]
+        printQRInTerminal: false, // تعطيل الرموز المشوهة في السجلات
+        browser: ["Windows", "Chrome", "122.0.0.0"] 
     });
 
-    // حفظ تحديثات الجلسة تلقائياً
     sock.ev.on('creds.update', saveCreds);
 
-    // مراقبة حالة الاتصال
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         
-        // إذا ظهر رمز QR جديد
+        // --- [ الحل الذكي لمشكلة الـ QR ] ---
         if (qr) {
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
+            const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
             console.log("------------------------------------------");
-            console.log("📢 امسح الرمز من الرابط التالي فوراً:");
-            console.log(qrUrl);
+            console.log("📢 امسح الرمز من هذا الرابط (افتحه في صفحة جديدة):");
+            console.log(qrImageUrl);
             console.log("------------------------------------------");
         }
 
-        // عند فتح الاتصال بنجاح
         if (connection === 'open') {
-            console.log("🚀 مبروك! البوت متصل الآن ومحمي سحابياً.");
+            console.log("------------------------------------------");
+            console.log("🚀 مبروك! البوت متصل الآن وجاهز لاستقبال الطلاب.");
+            console.log("------------------------------------------");
         }
 
-        // عند حدوث انقطاع
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log("⚠️ انقطع الاتصال.. جاري إعادة المحاولة:", shouldReconnect);
+            console.log("⚠️ انقطع الاتصال.. إعادة محاولة:", shouldReconnect);
             if (shouldReconnect) startBot();
         }
     });
 
-    // 4. منطق الاستجابة للرسائل (مثال بسيط)
+    // 4. استقبال الرسائل
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe) return;
@@ -72,8 +70,9 @@ async function startBot() {
         const from = msg.key.remoteJid;
         const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").toLowerCase();
 
-        if (text === 'بدء') {
-            await sock.sendMessage(from, { text: "أهلاً بك في مدرستنا! اكتب 'درس' لمشاهدة المحتوى." });
+        // رد تجريبي للتأكد من العمل
+        if (text === 'بدء' || text === 'سلام') {
+            await sock.sendMessage(from, { text: "أهلاً بك في بوت المدرسة! اكتب 'درس' للبدء." });
         }
     });
 }
