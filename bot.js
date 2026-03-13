@@ -6,22 +6,17 @@ const {
 } = require('@whiskeysockets/baileys');
 const mongoose = require('mongoose');
 const pino = require('pino');
-const fs = require('fs-extra');
-const path = require('path');
-
-// --- [ 1. جلب رابط القاعدة من المتغيرات التي أضفتها ] ---
-const mongoURI = process.env.MONGODB_URI;
 
 async function startBot() {
-    // الاتصال بـ MongoDB
+    // 1. الاتصال بـ MongoDB (تأكد من وجود المتغير في Railway)
+    const mongoURI = process.env.MONGODB_URI;
     try {
         await mongoose.connect(mongoURI);
-        console.log("✅ تم الاتصال بقاعدة البيانات.. الجلسة محمية!");
+        console.log("✅ متصل بـ MongoDB");
     } catch (err) {
-        console.error("❌ فشل الاتصال بـ MongoDB:", err);
+        console.error("❌ خطأ في الاتصال بالقاعدة:", err);
     }
 
-    // إعداد الجلسة (ستستخدم مجلد auth_info كواجهة مؤقتة للقاعدة)
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
     const { version } = await fetchLatestBaileysVersion();
 
@@ -29,22 +24,27 @@ async function startBot() {
         version,
         logger: pino({ level: 'fatal' }),
         auth: state,
-        printQRInTerminal: true, // سيظهر الـ QR في سجلات (Logs) ريلوي للمرة الأولى
-        browser: ["WhatsApp School", "Chrome", "1.0.0"]
+        // تم تعطيل الطباعة التقليدية لتجنب التشويش في السجلات
+        printQRInTerminal: false 
     });
 
-    // حفظ التحديثات تلقائياً
     sock.ev.on('creds.update', saveCreds);
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         
+        // --- [ هذه هي الطريقة التي طلبتها ] ---
         if (qr) {
-            console.log("⚠️ افتح سجلات ريلوي وامسح رمز QR Code الآن!");
+            // رابط واحد ثابت يتحدث تلقائياً ببيانات الـ QR الجديدة
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
+            console.log("------------------------------------------");
+            console.log("📢 امسح الرمز من الرابط التالي (يتحدث تلقائياً):");
+            console.log(qrUrl);
+            console.log("------------------------------------------");
         }
 
         if (connection === 'open') {
-            console.log("🚀 تم الاتصال بنجاح! مدرستك الآن تعمل 24/7 بدون انقطاع.");
+            console.log("🚀 تم الاتصال بنجاح! الجلسة الآن محفوظة في السحاب.");
         }
 
         if (connection === 'close') {
@@ -53,23 +53,7 @@ async function startBot() {
         }
     });
 
-    // --- [ منطق الدروس ] ---
-    sock.ev.on('messages.upsert', async (m) => {
-        const msg = m.messages[0];
-        if (!msg.message || msg.key.fromMe) return;
-
-        const from = msg.key.remoteJid;
-        const text = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").toLowerCase();
-
-        if (text === 'درس') {
-            const videoPath = './lessons/1/main_video.mp4';
-            if (fs.existsSync(videoPath)) {
-                await sock.sendMessage(from, { video: fs.readFileSync(videoPath), caption: "شاهد الدرس بتركيز." });
-            } else {
-                await sock.sendMessage(from, { text: "أهلاً بك! يرجى التأكد من رفع ملفات الدروس إلى GitHub داخل مجلد lessons." });
-            }
-        }
-    });
+    // يمكنك إضافة منطق الرسائل هنا لاحقاً
 }
 
 startBot();
