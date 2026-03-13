@@ -8,13 +8,13 @@ const mongoose = require('mongoose');
 const pino = require('pino');
 
 async function startBot() {
-    // 1. الاتصال بـ MongoDB (تأكد من وجود المتغير في Railway)
+    // 1. الاتصال بـ MongoDB
     const mongoURI = process.env.MONGODB_URI;
     try {
         await mongoose.connect(mongoURI);
         console.log("✅ متصل بـ MongoDB");
     } catch (err) {
-        console.error("❌ خطأ في الاتصال بالقاعدة:", err);
+        console.error("❌ خطأ في قاعدة البيانات:", err);
     }
 
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
@@ -24,8 +24,10 @@ async function startBot() {
         version,
         logger: pino({ level: 'fatal' }),
         auth: state,
-        // تم تعطيل الطباعة التقليدية لتجنب التشويش في السجلات
-        printQRInTerminal: false 
+        printQRInTerminal: false,
+        // --- [ التحديث الجديد هنا ] ---
+        // جعل الواتساب يعتقد أنك تتصل من متصفح Chrome حديث على نظام macOS
+        browser: ["Mac OS", "Chrome", "122.0.6261.112"] 
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -33,18 +35,16 @@ async function startBot() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         
-        // --- [ هذه هي الطريقة التي طلبتها ] ---
         if (qr) {
-            // رابط واحد ثابت يتحدث تلقائياً ببيانات الـ QR الجديدة
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
             console.log("------------------------------------------");
-            console.log("📢 امسح الرمز من الرابط التالي (يتحدث تلقائياً):");
+            console.log("📢 رابط الـ QR المحدث (افتحه وامسحه):");
             console.log(qrUrl);
             console.log("------------------------------------------");
         }
 
         if (connection === 'open') {
-            console.log("🚀 تم الاتصال بنجاح! الجلسة الآن محفوظة في السحاب.");
+            console.log("🚀 مبروك! تم الاتصال بنجاح وتجاوز مشكلة الربط.");
         }
 
         if (connection === 'close') {
@@ -52,8 +52,6 @@ async function startBot() {
             if (shouldReconnect) startBot();
         }
     });
-
-    // يمكنك إضافة منطق الرسائل هنا لاحقاً
 }
 
 startBot();
