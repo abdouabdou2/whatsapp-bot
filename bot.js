@@ -1,4 +1,4 @@
-const { default: makeWASocket, fetchLatestBaileysVersion, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, fetchLatestBaileysVersion, DisconnectReason } = require('@whiskeysockets/baileys');
 const { useMongoAuthState } = require('baileys-mongodb-storage');
 const mongoose = require('mongoose');
 const express = require('express');
@@ -9,15 +9,15 @@ const app = express();
 let lastQR = null;
 
 app.get('/qr', (req, res) => {
-    if (!lastQR) return res.send("⏳ جاري إنشاء الرمز... حدث الصفحة بعد قليل.");
+    if (!lastQR) return res.send("⏳ الرمز يتولد الآن.. انتظر ثوانٍ وحدث الصفحة.");
     res.setHeader('Content-Type', 'image/png');
     res.redirect(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(lastQR)}`);
 });
 
-app.get('/', (req, res) => res.send("✅ Bot is Online"));
+app.get('/', (req, res) => res.send("✅ Bot is Online & Session is on MongoDB"));
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, '0.0.0.0', () => console.log(`🌐 السيرفر يعمل على المنفذ ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🌐 Server active on port ${PORT}`));
 
 async function startBot() {
     try {
@@ -26,8 +26,8 @@ async function startBot() {
             console.log("✅ متصل بـ MongoDB");
         }
 
-        // استخدام الـ Collection لحفظ الجلسة
-        const collection = mongoose.connection.db.collection('auth_session_stable');
+        // استخدام كولكشن جديد تماماً لضمان طلب QR جديد
+        const collection = mongoose.connection.db.collection('auth_session_final');
         const { state, saveCreds } = await useMongoAuthState(collection);
         const { version } = await fetchLatestBaileysVersion();
 
@@ -36,7 +36,7 @@ async function startBot() {
             auth: state,
             printQRInTerminal: true,
             logger: pino({ level: 'fatal' }),
-            browser: ["Chrome (Linux)", "Chrome", "114.0.5735.199"]
+            browser: ["Chrome", "Windows", "10.0"]
         });
 
         sock.ev.on('creds.update', saveCreds);
@@ -46,14 +46,12 @@ async function startBot() {
             
             if (qr) {
                 lastQR = qr;
-                console.log("\n-------------------------------------------");
-                console.log("🆕 رمز QR جديد جاهز! امسحه الآن:");
+                console.log("\n🆕 امسح الرمز المربع الظاهر في الأسفل الآن:");
                 qrcodeTerminal.generate(qr, { small: true });
-                console.log("-------------------------------------------\n");
             }
 
             if (connection === 'open') {
-                console.log("🚀 مبروك! تم الاتصال بنجاح والجلسة آمنة في القاعدة.");
+                console.log("🚀 مبروك! تم الربط بنجاح.");
                 lastQR = null;
             }
 
@@ -66,7 +64,7 @@ async function startBot() {
             }
         });
     } catch (error) {
-        console.error("💥 خطأ فادح:", error);
+        console.error("💥 خطأ:", error);
         setTimeout(() => startBot(), 10000);
     }
 }
