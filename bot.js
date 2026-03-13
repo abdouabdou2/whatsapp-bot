@@ -6,7 +6,6 @@ const {
 } = require("@whiskeysockets/baileys");
 const { Boom } = require("@hapi/boom");
 const pino = require("pino");
-const qrcode = require("qrcode-terminal");
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState("auth_info");
@@ -15,7 +14,7 @@ async function startBot() {
     const sock = makeWASocket({
         version,
         logger: pino({ level: "silent" }),
-        printQRInTerminal: false, // سنطبعه يدوياً لتجنب مشاكل الشاشة
+        printQRInTerminal: false, // تم تعطيل الرسم اليدوي نهائياً
         auth: state,
         browser: ["المدرسة الرقمية", "Chrome", "1.0.0"]
     });
@@ -24,32 +23,21 @@ async function startBot() {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
-            console.log("\n\n📸 --- امسح الكود التالي للربط --- 📸\n");
-            qrcode.generate(qr, { small: true });
-            console.log("\n🔗 رابط مباشر للكود (افتحه في صفحة جديدة):");
+            console.log("\n\n🔗 --- رابط الـ QR Code الخاص بك جاهز --- 🔗");
+            console.log("اضغط مطولاً على الرابط التالي وافتحه في صفحة جديدة:");
             console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
-            console.log("\n-----------------------------------\n\n");
+            console.log("-------------------------------------------\n\n");
         }
 
         if (connection === "close") {
             const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
             if (shouldReconnect) startBot();
         } else if (connection === "open") {
-            console.log("✅ تم الاتصال بنجاح.. المدرسة جاهزة!");
+            console.log("✅ تم الاتصال بنجاح.. المدرسة جاهزة للعمل!");
         }
     });
 
     sock.ev.on("creds.update", saveCreds);
-
-    sock.ev.on("messages.upsert", async (m) => {
-        const msg = m.messages[0];
-        if (!msg.message || msg.key.fromMe) return;
-        const from = msg.key.remoteJid;
-        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
-        if (body === "أهلا") {
-            await sock.sendMessage(from, { text: "أهلاً بك في بوت المدرسة الرقمية! 🎓" });
-        }
-    });
 }
 
 startBot();
