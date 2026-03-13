@@ -7,7 +7,7 @@ const qrcodeTerminal = require('qrcode-terminal'); // لإظهار الرمز ف
 
 const app = express();
 let lastQR = null;
-
+ 
 app.get('/qr', (req, res) => {
     if (!lastQR) return res.send("⏳ الرمز لم يتولد بعد.. حدث الصفحة كل 5 ثوانٍ.");
     res.setHeader('Content-Type', 'image/png');
