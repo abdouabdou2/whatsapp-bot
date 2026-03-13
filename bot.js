@@ -1,39 +1,35 @@
 const {
     default: makeWASocket,
     useMultiFileAuthState,
-    DisconnectReason,
     fetchLatestBaileysVersion
 } = require("@whiskeysockets/baileys");
-const { Boom } = require("@hapi/boom");
 const pino = require("pino");
 
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState("auth_info");
+    // استخدام ذاكرة مؤقتة لضمان توليد QR جديد
+    const { state, saveCreds } = await useMultiFileAuthState("session_" + Math.floor(Math.random() * 1000));
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
         version,
-        logger: pino({ level: "silent" }),
-        printQRInTerminal: false, // تم تعطيل الرسم اليدوي نهائياً
+        logger: pino({ level: "fatal" }), // إخفاء كافة التحذيرات والرسائل المزعجة
+        printQRInTerminal: false,
         auth: state,
         browser: ["المدرسة الرقمية", "Chrome", "1.0.0"]
     });
 
     sock.ev.on("connection.update", (update) => {
-        const { connection, lastDisconnect, qr } = update;
+        const { connection, qr } = update;
 
         if (qr) {
-            console.log("\n\n🔗 --- رابط الـ QR Code الخاص بك جاهز --- 🔗");
-            console.log("اضغط مطولاً على الرابط التالي وافتحه في صفحة جديدة:");
+            console.log("\n\n************************************************");
+            console.log("🔗 رابط الـ QR CODE الخاص بك جاهز الآن:");
             console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
-            console.log("-------------------------------------------\n\n");
+            console.log("************************************************\n\n");
         }
 
-        if (connection === "close") {
-            const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (shouldReconnect) startBot();
-        } else if (connection === "open") {
-            console.log("✅ تم الاتصال بنجاح.. المدرسة جاهزة للعمل!");
+        if (connection === "open") {
+            console.log("✅✅✅ تم الاتصال بنجاح! البوت يعمل الآن.");
         }
     });
 
