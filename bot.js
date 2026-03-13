@@ -6,13 +6,13 @@ const {
 const pino = require("pino");
 
 async function startBot() {
-    // توليد جلسة جديدة كل مرة لضمان ظهور QR جديد فوراً
-    const { state, saveCreds } = await useMultiFileAuthState("session_" + Date.now());
+    // استخدام مجلد جلسة ثابت لضمان عدم تكرار الطلبات غير الضرورية
+    const { state, saveCreds } = await useMultiFileAuthState("bot_session");
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
         version,
-        logger: pino({ level: "fatal" }), // هذا السطر سيحذف كل التحذيرات الصفراء
+        logger: pino({ level: "fatal" }), // إخفاء التحذيرات المزعجة
         printQRInTerminal: false,
         auth: state,
         browser: ["المدرسة الرقمية", "Chrome", "1.0.0"]
@@ -22,10 +22,14 @@ async function startBot() {
         const { connection, qr } = update;
 
         if (qr) {
-            console.log("\n\n================================================");
-            console.log("🔗 رابط الـ QR CODE الخاص بك جاهز (انسخه وافتحه):");
-            console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
-            console.log("================================================\n\n");
+            // إضافة Timestamp للرابط لإجبار المتصفح على تحديث الصورة
+            const timestamp = Date.now();
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}&t=${timestamp}`;
+            
+            console.log("\n\n🔄 --- تم تحديث كود الـ QR الآن --- 🔄");
+            console.log("رابط الكود الجديد (اضغط عليه فوراً):");
+            console.log(qrUrl);
+            console.log("------------------------------------------\n\n");
         }
 
         if (connection === "open") {
